@@ -1,0 +1,11 @@
+/build-wasm-pthreads/
+/build-stage2-native/
+/build-stage2-browser-profile/
+/bin/
+/lib/
+/check/
+/inc/
+/status/
+/testing/
+/browser-airr.tsv
+/browser-stage2.log

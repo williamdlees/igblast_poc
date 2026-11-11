@@ -1,0 +1,379 @@
+diff --git a/include/corelib/impl/std_backport.hpp b/include/corelib/impl/std_backport.hpp
+index 77907005..b3953b05 100644
+--- a/include/corelib/impl/std_backport.hpp
++++ b/include/corelib/impl/std_backport.hpp
+@@ -37,6 +37,7 @@
+ 
+ #include <type_traits>
+ #include <array>
++#include <new>
+ 
+ namespace std
+ { // backported C++20,23 defs
+@@ -168,4 +169,3 @@ namespace std
+ 
+ 
+ #endif
+-
+diff --git a/include/objtools/readers/co_generator.hpp b/include/objtools/readers/co_generator.hpp
+index a1c225dc..7c6b8197 100644
+--- a/include/objtools/readers/co_generator.hpp
++++ b/include/objtools/readers/co_generator.hpp
+@@ -3,6 +3,7 @@
+ 
+ #include <corelib/ncbistl.hpp>
+ #include <coroutine>
++#include <exception>
+ 
+ BEGIN_SCOPE(ncbi)
+ 
+diff --git a/src/algo/blast/blastinput/igblastn_args.cpp b/src/algo/blast/blastinput/igblastn_args.cpp
+index f5620dd2..c8323c63 100644
+--- a/src/algo/blast/blastinput/igblastn_args.cpp
++++ b/src/algo/blast/blastinput/igblastn_args.cpp
+@@ -76,7 +76,6 @@ CIgBlastnAppArgs::CIgBlastnAppArgs()
+     m_Args.push_back(arg);
+ 
+     m_StdCmdLineArgs.Reset(new CStdCmdLineArgs);
+-    m_StdCmdLineArgs->SetSRAaccessionEnabled(true); 
+     arg.Reset(m_StdCmdLineArgs);
+     m_Args.push_back(arg);
+ 
+@@ -150,4 +149,3 @@ CIgBlastnAppArgs::GetQueryBatchSize() const
+ 
+ END_SCOPE(blast)
+ END_NCBI_SCOPE
+-
+diff --git a/src/algo/blast/format/vecscreen_run.cpp b/src/algo/blast/format/vecscreen_run.cpp
+index 1a8296ee..206222aa 100644
+--- a/src/algo/blast/format/vecscreen_run.cpp
++++ b/src/algo/blast/format/vecscreen_run.cpp
+@@ -476,7 +476,7 @@ CVecscreenRun::CFormatter::FormatResults(CNcbiOstream& out,
+                     jobj.insert("query_end", align.GetSeqStop(0)+1);
+                     jobj.insert("query_strand", (align.GetSeqStrand(0)==eNa_strand_plus?"+":"-"));
+                     jobj.insert("match_strength", match_type_strs[match_score]);
+-                    jobj.insert("drop_count", mi->drops.size());
++                    jobj.insert("drop_count", static_cast<Uint8>(mi->drops.size()));
+                     jobj.insert("subject_id", sid);
+                     jobj.insert("subject_title", stitle);
+                 
+diff --git a/src/app/igblast/CMakeLists.igblastn.app.txt b/src/app/igblast/CMakeLists.igblastn.app.txt
+index 3a264039..79d951a2 100644
+--- a/src/app/igblast/CMakeLists.igblastn.app.txt
++++ b/src/app/igblast/CMakeLists.igblastn.app.txt
+@@ -2,8 +2,7 @@
+ 
+ NCBI_begin_app(igblastn)
+   NCBI_sources(igblastn_app)
+-  NCBI_uses_toolkit_libraries(blast_app_util blast_sra_input igblast)
+-  NCBI_requires(-Cygwin VDB)
++  NCBI_uses_toolkit_libraries(blast_app_util igblast)
++  NCBI_requires(-Cygwin)
+   NCBI_project_watchers(camacho madden maning fongah2)
+ NCBI_end_app()
+-
+diff --git a/src/app/igblast/igblastn.hpp b/src/app/igblast/igblastn.hpp
+index a4b41097..fae478c2 100644
+--- a/src/app/igblast/igblastn.hpp
++++ b/src/app/igblast/igblastn.hpp
+@@ -232,7 +232,6 @@ private:
+     vector< CRef < CIgWorker >  >           m_workers;
+     CRef < CIgFormatter  >                  m_formatter;
+     size_t				    m_worker_thread_num;
+-    CRef <CSraInputSource>                  m_sra_src;
+     CBlastUsageReport m_UsageReport;
+ };
+ 
+diff --git a/src/app/igblast/igblastn_app.cpp b/src/app/igblast/igblastn_app.cpp
+index 97c06f78..8c535874 100644
+--- a/src/app/igblast/igblastn_app.cpp
++++ b/src/app/igblast/igblastn_app.cpp
+@@ -45,7 +45,6 @@
+ #include <algo/blast/api/objmgr_query_data.hpp>
+ #include <algo/blast/format/blast_format.hpp>
+ #include <algo/blast/blastinput/blast_input.hpp>
+-#include <algo/blast/blast_sra_input/blast_sra_input.hpp>
+ #include "../blast/blast_app_util.hpp"
+ 
+ #ifndef SKIP_DOXYGEN_PROCESSING
+@@ -687,7 +686,6 @@ void CIgBlastnApp::Init()
+     
+     m_run_thread_count = 0;
+     m_worker_thread_num =1;
+-    m_sra_src = NULL;
+     
+ }
+ unsigned int  CIgBlastnApp::x_CountUserBatches(CBlastInputSourceConfig &iconfig, int batch_size )
+@@ -742,45 +740,8 @@ int CIgBlastnApp::Run(void)
+                                      m_query_opts->GetRange());
+         iconfig.SetQueryLocalIdMode();
+ 	//.......................................................
+-	// construct input source from file or SRA accession
+-	if( args[kArgSraAccession] && (args[kArgSraAccession].AsString() != "") ) {
+-	    // assuming SRA SUN accessions
+-	    vector < string >  all_sra_runs;
+-	    string sra_run_accessions = args[kArgSraAccession].AsString();
+-	    vector<string> run_arr;
+-	    string delim = ", ";
+-	    NStr::Split( sra_run_accessions, delim, run_arr );
+-
+-	    for( int ndx=0; ndx < (int)run_arr.size(); ndx ++){
+-		string one_run = NStr::TruncateSpaces( run_arr[ndx]);
+-		all_sra_runs.push_back( one_run );
+-	    }
+-	    try
+-	    { 
+-		m_sra_src.Reset(new CSraInputSource( all_sra_runs ) ) ;
+-	    }
+-	    catch (const CException& e) {
+-		ERR_POST(e);
+-		cout << "Error: "<<e.what() << endl;
+-		cout <<"Error: invalid SRA accession(s): "<<sra_run_accessions<< endl;
+-		return -1;
+-	    }
+-	    catch(...){
+-		cout <<"Error: invalid SRA accessions: "<<sra_run_accessions<< endl;
+-		return -1;
+-	    }
+-	    if( m_sra_src.Empty() ){
+-		cout <<"Error: invalid SRA accession "<<sra_run_accessions<<endl;
+-		return -1;
+-	    }
+-	    //
+-	    m_input.Reset( new CBlastInput( m_sra_src, 10000));
+-	} // end if SRA run accession provided
+-	else 
+-	{   
+-	    m_fasta.Reset( new CBlastFastaInputSource(m_CmdLineArgs->GetInputStream(), iconfig));
+-	    m_input.Reset( new CBlastInput(m_fasta.GetPointer(), 10000));
+-	}
++	m_fasta.Reset( new CBlastFastaInputSource(m_CmdLineArgs->GetInputStream(), iconfig));
++	m_input.Reset( new CBlastInput(m_fasta.GetPointer(), 10000));
+ 
+ 	
+ 
+diff --git a/src/build-system/cmake/CMakeChecks.compiler.cmake b/src/build-system/cmake/CMakeChecks.compiler.cmake
+index 796a9510..a86fdcfb 100644
+--- a/src/build-system/cmake/CMakeChecks.compiler.cmake
++++ b/src/build-system/cmake/CMakeChecks.compiler.cmake
+@@ -656,7 +656,7 @@ if(NOT NCBI_PTBCFG_FLAGS_DEFINED)
+         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--no-undefined")
+     endif ()
+ 
+-    if (NOT WIN32 AND NOT APPLE AND NOT CYGWIN)
++    if (NOT WIN32 AND NOT APPLE AND NOT CYGWIN AND NOT EMSCRIPTEN)
+ #this add RUNPATH to binaries (RPATH is already there anyway), which makes it more like binaries built by C++ Toolkit
+         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--enable-new-dtags")
+     endif()
+diff --git a/src/connect/CMakeLists.txt b/src/connect/CMakeLists.txt
+index 8af44220..86ff7a67 100644
+--- a/src/connect/CMakeLists.txt
++++ b/src/connect/CMakeLists.txt
+@@ -4,7 +4,7 @@
+ # independent C++ toolkit library
+ # These variables capture the split
+ 
+-if (UNIX)
++if (UNIX AND NOT EMSCRIPTEN)
+     set(lbsm_src ncbi_lbsm ncbi_lbsm_ipc)
+ endif()
+ 
+diff --git a/src/connect/ncbi_lbdns.c b/src/connect/ncbi_lbdns.c
+index 478d9d09..fe364677 100644
+--- a/src/connect/ncbi_lbdns.c
++++ b/src/connect/ncbi_lbdns.c
+@@ -37,7 +37,7 @@
+ 
+ #define NCBI_USE_ERRCODE_X   Connect_LBSM
+ 
+-#ifdef NCBI_OS_UNIX
++#if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+ 
+ #include "ncbi_lb.h"
+ #include <ctype.h>
+@@ -1296,7 +1296,7 @@ static int/*bool*/ s_Resolve(SERV_ITER iter)
+     const struct SLBDNS_Data* data = (const struct SLBDNS_Data*) iter->data;
+     struct sockaddr_in ns_save;
+     int ns_count, ns_retry, rv;
+-    u_long ns_options;
++    unsigned long ns_options;
+     res_state r;
+ 
+     assert(!data->n_cand  &&  !data->empty);
+diff --git a/src/connect/ncbi_lbsmd.c b/src/connect/ncbi_lbsmd.c
+index 442c3f44..26470e5c 100644
+--- a/src/connect/ncbi_lbsmd.c
++++ b/src/connect/ncbi_lbsmd.c
+@@ -35,7 +35,7 @@
+ #include "ncbi_priv.h"
+ 
+ 
+-#ifdef NCBI_OS_UNIX
++#if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+ 
+ #include "ncbi_ansi_ext.h"
+ #include "ncbi_lb.h"
+diff --git a/src/connect/ncbi_service.c b/src/connect/ncbi_service.c
+index 20ec342b..b026ab5c 100644
+--- a/src/connect/ncbi_service.c
++++ b/src/connect/ncbi_service.c
+@@ -33,7 +33,7 @@
+ #include "ncbi_ansi_ext.h"
+ #include "ncbi_dispd.h"
+ #include "ncbi_local.h"
+-#ifdef NCBI_OS_UNIX
++#if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+ #  include "ncbi_lbsmd.h"
+ #endif /*NCBI_OS_UNIX*/
+ #ifdef NCBI_CXX_TOOLKIT
+@@ -1070,12 +1070,12 @@ static SERV_ITER x_Open(const char*         service,
+     int exact = s_Fast;
+     int/*bool*/
+         do_local,
+-#ifdef NCBI_OS_UNIX
++#if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+         do_lbsmd   = -1/*unassigned*/,
+ #endif /*NCBI_OS_UNIX*/
+ #ifdef NCBI_CXX_TOOLKIT
+         do_lbnull  = -1/*unassigned*/,
+-#  ifdef NCBI_OS_UNIX
++#  if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+         do_lbdns   = -1/*unassigned*/,
+ #  endif /*NCBI_OS_UNIX*/
+         do_linkerd = -1/*unassigned*/,
+@@ -1183,11 +1183,11 @@ static SERV_ITER x_Open(const char*         service,
+         assert(!prefix  ||  (*prefix  &&  domain));
+         if (!prefix  &&  domain) {
+             /* disable all domain-unaware resolvers */
+-#ifdef NCBI_OS_UNIX
++#if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+             do_lbsmd   =
+ #endif /*NCBI_OS_UNIX*/
+ #ifdef NCBI_CXX_TOOLKIT
+-#  ifdef NCBI_OS_UNIX
++#  if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+             do_lbdns   =
+ #  endif /*NCBI_OS_UNIX*/
+             do_linkerd =
+@@ -1197,12 +1197,12 @@ static SERV_ITER x_Open(const char*         service,
+         }
+         if (!ismask  &&  strchr(svc, '/')) {
+             /* disable resolvers that cannot handle compound service names */
+-#ifdef NCBI_OS_UNIX
++#if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+             do_lbsmd   =
+ #endif /*NCBI_OS_UNIX*/
+ #ifdef NCBI_CXX_TOOLKIT
+             do_lbnull  =
+-#  ifdef NCBI_OS_UNIX
++#  if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+             do_lbdns   =
+ #  endif /*NCBI_OS_UNIX*/
+ #endif /*NCBI_CXX_TOOLKIT*/
+@@ -1319,7 +1319,7 @@ static SERV_ITER x_Open(const char*         service,
+             iter->types |= fSERV_Firewall;
+         if (net_info->stateless)
+             iter->types |= fSERV_Stateless;
+-#ifdef NCBI_OS_UNIX
++#if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+         /* special case of LBSM control */
+         if (net_info->lb_disable)
+             do_lbsmd = 0/*false*/;
+@@ -1335,7 +1335,7 @@ static SERV_ITER x_Open(const char*         service,
+     if (iter->external) {
+         /* disable all resolvers that cannot do external */
+ #ifdef NCBI_CXX_TOOLKIT
+-#  ifdef NCBI_OS_UNIX
++#  if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+         do_lbdns   =
+ #  endif /*NCBI_OS_UNIX*/
+         do_lbnull  = 0/*false*/;
+@@ -1345,7 +1345,7 @@ static SERV_ITER x_Open(const char*         service,
+         /* disable all resolvers that cannot handle service wildcards */
+ #ifdef NCBI_CXX_TOOLKIT
+         do_lbnull  =
+-#  ifdef NCBI_OS_UNIX
++#  if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+         do_lbdns   =
+ #  endif /*NCBI_OS_UNIX*/
+         do_linkerd =
+@@ -1367,7 +1367,7 @@ static SERV_ITER x_Open(const char*         service,
+          !(op = SERV_LBNULL_Open(iter, info, exact, prefix, domain)))
+ #endif /*NCBI_CXX_TOOLKIT*/
+ 
+-#ifdef NCBI_OS_UNIX
++#if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+         &&
+         (!do_lbsmd                                                         ||
+          !(do_lbsmd  = !s_IsMapperConfigured(svc, REG_CONN_LBSMD_DISABLE)) ||
+@@ -1376,7 +1376,7 @@ static SERV_ITER x_Open(const char*         service,
+                                  !(do_dispd   = !s_IsMapperConfigured
+                                    (svc, REG_CONN_DISPD_DISABLE)))
+ #  ifdef NCBI_CXX_TOOLKIT
+-#    ifdef NCBI_OS_UNIX
++#    if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+                                 &&
+                                 (!do_lbdns                                 ||
+                                  !(do_lbdns   = s_IsMapperConfigured
+@@ -1395,7 +1395,7 @@ static SERV_ITER x_Open(const char*         service,
+ #endif /*NCBI_OS_UNIX*/
+ 
+ #ifdef NCBI_CXX_TOOLKIT
+-#  ifdef NCBI_OS_UNIX
++#  if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+         &&
+         (!do_lbdns                                                         ||
+          (do_lbdns < 0    &&  !(do_lbdns   = s_IsMapperConfigured
+@@ -1421,11 +1421,11 @@ static SERV_ITER x_Open(const char*         service,
+          !(op = SERV_DISPD_Open(iter, info, net_info)))) {
+         if (!s_Fast  &&  net_info
+             &&  !do_local
+-#ifdef NCBI_OS_UNIX
++#if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+             &&  !do_lbsmd
+ #endif /*NCBI_OS_UNIX*/
+ #ifdef NCBI_CXX_TOOLKIT
+-#  ifdef NCBI_OS_UNIX
++#  if defined(NCBI_OS_UNIX) && !defined(__EMSCRIPTEN__)
+             &&  !do_lbdns
+ #  endif /*NCBI_OS_UNIX*/
+             &&  !do_lbnull  &&  !do_linkerd  &&  !do_namerd
+diff --git a/src/corelib/ncbi_stack_win64.cpp b/src/corelib/ncbi_stack_win64.cpp
+index 642b7411..a6364d74 100644
+--- a/src/corelib/ncbi_stack_win64.cpp
++++ b/src/corelib/ncbi_stack_win64.cpp
+@@ -48,7 +48,7 @@ BEGIN_NCBI_SCOPE
+ 
+ #define lenof(a) (sizeof(a) / sizeof((a)[0]))
+ #define MAXNAMELEN 1024 // max name length for found symbols
+-#define IMGSYMLEN (sizeof IMAGEHLP_SYMBOL64)
++#define IMGSYMLEN (sizeof(IMAGEHLP_SYMBOL64))
+ #define TTBUFLEN 65535
+ 
+ 
+diff --git a/src/corelib/ncbi_system.cpp b/src/corelib/ncbi_system.cpp
+index ea638175..d186a33e 100644
+--- a/src/corelib/ncbi_system.cpp
++++ b/src/corelib/ncbi_system.cpp
+@@ -44,6 +44,7 @@
+ #include <corelib/ncbierror.hpp>
+ #include "ncbisys.hpp"
+ #include <array>
++#include <new>
+ 
+ #define NCBI_USE_ERRCODE_X   Corelib_System
+ 
+diff --git a/src/util/regexp/config.h b/src/util/regexp/config.h
+index e1ce7d48..99abb4c2 100644
+--- a/src/util/regexp/config.h
++++ b/src/util/regexp/config.h
+@@ -246,7 +246,9 @@ sure both macros are undefined; an emulation function will then be used. */
+ /* #undef SUPPORT_DIFF_FUZZ */
+ 
+ /* Define to any value to enable support for Just-In-Time compiling. */
++#ifndef __EMSCRIPTEN__
+ #define SUPPORT_JIT 1
++#endif
+ 
+ /* Define to any value to allow pcre2grep to be linked with libbz2, so that it
+    is able to handle .bz2 files. */
