@@ -50,14 +50,17 @@ download button returned to disabled.
 Before the artifacts were copied, a run had visibly failed to load
 `/bin/makeblastdb.js` and cleaned up its OPFS directory. After the four
 hashes matched, the complete browser workflow passed. Native-output parity,
-failure-path coverage beyond the missing-asset check, live OGRDB in the
-integrated deployment, and large-file behavior are not claimed here; the
-planned correctness and I/O checks remain Stage 6 work.
+additional failure-path coverage, and 50 MiB I/O measurements are documented
+in Stage 6. Live OGRDB behavior in the integrated deployment remains covered
+by the separate Stage 3 verification.
 
 The Stage 5 app connects the reference preparation worker, the NCBI
 `makeblastdb` and `igblastn` workers, OPFS staging, and a user-triggered AIRR
 TSV download. The implementation is in `tools/stage5`. It is a minimal local
 proof of concept, not a production PWA.
+The shared OPFS-to-MEMFS and MEMFS-to-OPFS transfer functions are in
+`tools\stage5\opfs-memfs-bridge.js`; Stage 6 reuses them for its I/O
+measurement.
 
 ## Prerequisites
 

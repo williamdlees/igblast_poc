@@ -4,6 +4,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..', '..');
 const fixtureRoot = path.join(root, 'tests', 'fixtures', 'stage3', 'ogrdb');
+const failedFixturePath = process.env.OGRDB_FAIL_PATH;
 const fixtureManifest = JSON.parse(
   fs.readFileSync(path.join(fixtureRoot, 'manifest.json'), 'utf8')
 );
@@ -34,6 +35,11 @@ const server = http.createServer((request, response) => {
   }
   const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
   if (pathname.startsWith('/api_v2/')) {
+    if (failedFixturePath && pathname === failedFixturePath) {
+      response.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' })
+        .end(`Synthetic OGRDB fixture failure for ${pathname}`);
+      return;
+    }
     const entry = fixtureManifest.responses[pathname];
     if (!entry) {
       response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
