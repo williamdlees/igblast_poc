@@ -104,13 +104,27 @@ Stage 2 is explicitly FASTA-only. SRA input is out of scope, and porting VDB mus
 
 ## Subsequent implementation todos
 
-Only after both user review gates:
+Proceed through these stages in order. Report the results at the end of each stage and wait for the user's review before starting the next.
 
-1. **Prove the Python/reference stage.** Complete; see [Stage 3 results](docs/stage3-pyodide-reference.md). Awaiting user review before proceeding to the storage bridge.
-2. **Validate the storage bridge.** Spike and select a worker-compatible input, database and output storage path; verify all required file operations, cross-runtime handoff, data integrity, cleanup and errors before relying on it in the workflow.
-3. **Connect the local browser workflow.** Implement the minimal static UI, workers and local serving instructions; wire reference preparation, V/D/J database creation, annotation and user-initiated AIRR TSV export. Provide explicit diagnostics and a local fixture option for deterministic/offline use or unavailable live data; do not treat it as a CORS workaround under the same-origin deployment assumption.
-4. **Verify correctness and measure I/O.** Compare browser output with the matching native baseline on the same fixtures, exercise failure cases and responsive UI, then benchmark 50 MiB import/export against native file copying on the same machine and report methodology and results. Do not add independent AIRR-schema validation; the user defers that check.
-5. **Document results and limitations.** Provide reproducible Windows CMD instructions, exact prerequisites and Conda environment requirement, source/build/version and asset provenance, benchmark observations, failure modes, storage cleanup and explicit feasibility conclusions.
+### Stage 3: Prove the Python/reference stage
+
+**Complete; see [Stage 3 results](docs/stage3-pyodide-reference.md).** Pyodide and `receptor_utils` ran in a browser worker, prepared references matching native output, and verified live same-origin OGRDB access separately from the deterministic fixture.
+
+### Stage 4: Validate the storage bridge
+
+**Complete; see [Stage 4 results](docs/stage4-storage-bridge.md).** OPFS is the selected origin storage, with per-worker MEMFS copies. The spike validates the storage boundary and generic Emscripten MEMFS handoff; connecting actual NCBI workers through OPFS remains Stage 5 work.
+
+### Stage 5: Connect the local browser workflow
+
+Implement the minimal static UI, workers and local serving instructions. Wire reference preparation, V/D/J database creation, annotation and user-initiated AIRR TSV export. Provide explicit diagnostics and a local fixture option for deterministic/offline use or unavailable live data; do not treat it as a CORS workaround under the same-origin deployment assumption. **Complete; see [Stage 5 results](docs/stage5-local-workflow.md).** The pinned real NCBI browser assets passed hash verification, and the complete OPFS → three `makeblastdb` runs → `igblastn` → user-triggered AIRR TSV flow completed in Edge on the 10-query fixture. Native comparison, broader failure coverage and 50 MiB I/O measurements remain Stage 6.
+
+### Stage 6: Verify correctness and measure I/O
+
+Compare browser output with the matching native baseline on the same fixtures, exercise failure cases and responsive UI, then benchmark 50 MiB import/export against native file copying on the same machine and report methodology and results. Do not add independent AIRR-schema validation; the user defers that check.
+
+### Stage 7: Document results and limitations
+
+Provide reproducible Windows CMD instructions, exact prerequisites and Conda environment requirement, source/build/version and asset provenance, benchmark observations, failure modes, storage cleanup and explicit feasibility conclusions.
 
 ## Verification and acceptance
 
