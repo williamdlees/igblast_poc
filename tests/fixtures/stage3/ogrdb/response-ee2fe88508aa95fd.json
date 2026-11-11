@@ -1,0 +1,48 @@
+{
+  "germline_species": [
+    {
+      "germline_set_id": "9606.IGHC",
+      "germline_set_name": "IGHC",
+      "locus": "IGH",
+      "species": {
+        "id": "9606",
+        "label": "Homo sapiens"
+      },
+      "species_subgroup": "",
+      "species_subgroup_type": "none"
+    },
+    {
+      "germline_set_id": "9606.IGH_VDJ",
+      "germline_set_name": "IGH_VDJ",
+      "locus": "IGH",
+      "species": {
+        "id": "9606",
+        "label": "Homo sapiens"
+      },
+      "species_subgroup": "",
+      "species_subgroup_type": "none"
+    },
+    {
+      "germline_set_id": "9606.IGKappa_VJ",
+      "germline_set_name": "IGKappa_VJ",
+      "locus": "IGK",
+      "species": {
+        "id": "9606",
+        "label": "Homo sapiens"
+      },
+      "species_subgroup": "",
+      "species_subgroup_type": "none"
+    },
+    {
+      "germline_set_id": "9606.IGLambda_VJ",
+      "germline_set_name": "IGLambda_VJ",
+      "locus": "IGL",
+      "species": {
+        "id": "9606",
+        "label": "Homo sapiens"
+      },
+      "species_subgroup": "",
+      "species_subgroup_type": "none"
+    }
+  ]
+}

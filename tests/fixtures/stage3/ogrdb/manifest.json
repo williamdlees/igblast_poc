@@ -1,0 +1,56 @@
+{
+  "captured_at": "2026-11-11T12:52:02.543599+00:00",
+  "api_base": "https://ogrdb.airr-community.org/api_v2",
+  "species": "Homo sapiens",
+  "locus": "IGH",
+  "set_name": "IGH_VDJ",
+  "set_id": "9606.IGH_VDJ",
+  "receptor_utils_commit": "f6bfb03f00358babc07bf6ec20899e85528887ce",
+  "responses": {
+    "/api_v2/germline/species": {
+      "file": "response-721605c1a5d215fc.json",
+      "sha256": "81dfbeed061ac3dc95ef77d59a7112681434564f1c39492f0bf278090a4d1413",
+      "size": 355,
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      }
+    },
+    "/api_v2/germline/sets/9606": {
+      "file": "response-ee2fe88508aa95fd.json",
+      "sha256": "63707ebd2c6b485c3442e427a8f49ffae0545384248fd35913334ed22eec9237",
+      "size": 1095,
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      }
+    },
+    "/api_v2/germline/set/9606.IGH_VDJ/latest/ungapped_ex": {
+      "file": "response-cfda44853c798859.fasta",
+      "sha256": "5beb005256e702a41ef78c359481d645ca7bcf7bb400b598830058aa278bb520",
+      "size": 65230,
+      "status": 200,
+      "headers": {
+        "content-type": "application/octet-stream"
+      }
+    },
+    "/api_v2/germline/set/9606.IGH_VDJ/latest/gapped_ex": {
+      "file": "response-652f27664ae03982.fasta",
+      "sha256": "2321eb5b788bf95103a2221eb327ef327c735e3e9427713c71285dcc6df81d9a",
+      "size": 70192,
+      "status": 200,
+      "headers": {
+        "content-type": "application/octet-stream"
+      }
+    },
+    "/api_v2/germline/set/9606.IGH_VDJ/latest": {
+      "file": "response-2c8279feceee1c91.json",
+      "sha256": "251c5f13705b74f3bdaf6fc6f593616f433c710a766d8e54f9cbc9c2f1ac95d3",
+      "size": 1229243,
+      "status": 200,
+      "headers": {
+        "content-type": "application/octet-stream"
+      }
+    }
+  }
+}
