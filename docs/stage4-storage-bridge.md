@@ -1,7 +1,7 @@
 # Storage bridge spike
 
-**Status: implementation step 2 complete; review before connecting the full
-browser workflow.**
+**Status: complete.** The Stage 5 workflow subsequently connected the OPFS
+boundary to the real browser NCBI workers.
 
 ## Selected path
 
@@ -20,9 +20,8 @@ workers. The consumer worker loads Pyodide 0.27.7 and exercises its
 Emscripten MEMFS `open`/`write`/`read`/`unlink` operations, copying the query
 and an opaque binary payload from OPFS to MEMFS and a generated output back
 to OPFS. This validates the storage boundary and the bounded-copy mechanics
-with a real Emscripten MEMFS implementation. It does not yet invoke the NCBI
-modules through OPFS; connecting those tools is the next implementation
-step.
+with a real Emscripten MEMFS implementation. Stage 5 later connected the
+selected storage boundary to the browser NCBI workflow.
 
 ## Verification result
 
@@ -65,11 +64,9 @@ The Edge profile under `tools\stage4\results` is generated and ignored.
 
 The database payload is deterministic opaque test bytes, not a real
 `makeblastdb` database, and the output is a byte-for-byte test copy, not
-IgBLAST output. The Stage 2 harness already demonstrated real NCBI module
-execution with per-module MEMFS and explicit file handoff, but this step did
-not rerun those modules through OPFS. Step 3 must connect the selected OPFS
-boundary to each real NCBI worker and check the actual V/D/J database
-artifacts and AIRR output.
+IgBLAST output. The Stage 2 harness demonstrated real NCBI module execution
+with per-module MEMFS and explicit file handoff. Stage 5 subsequently
+connected the local app workflow to OPFS and the real NCBI workers.
 
 This is a correctness spike, not a benchmark: it does not test 50 MiB files,
 quota exhaustion, browser eviction, persistence permission, cancellation, or
@@ -78,5 +75,5 @@ quota/write failures and clean their own temporary files. The consumer
 currently reads small test files into typed arrays for hashing; the harness
 does not establish large-file memory bounds.
 
-**Review checkpoint:** approve the OPFS-to-worker-MEMFS storage choice and
-this bounded evidence before proceeding to step 3.
+The user proceeded to connect the local browser workflow after this review
+checkpoint. The consolidated feasibility conclusion is in [Stage 7](stage7-final-report.md).

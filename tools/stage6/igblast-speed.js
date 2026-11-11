@@ -7,11 +7,22 @@ let runDirectoryName;
 let referenceFiles;
 let databaseFiles;
 let runNumber = 0;
-const smallFixture = new URL(location.href).searchParams.get('fixture') === 'small';
+const pageParams = new URL(location.href).searchParams;
+const smallFixture = pageParams.get('fixture') === 'small';
+const configuredThreads = Number(pageParams.get('threads') || '1');
+const toolTimeoutMs = Number(pageParams.get('tool-timeout-ms') || '600000');
+const referenceDirectory = pageParams.get('reference-artifacts');
 const expectedQueryRecords = smallFixture ? 10 : 10000;
 const queryPath = smallFixture
   ? '/tests/fixtures/stage2/query.fasta'
   : '/tools/stage6/results/query-10000.fasta';
+
+if (!Number.isSafeInteger(configuredThreads) || configuredThreads < 1 || configuredThreads > 64) {
+  throw new Error(`Invalid thread count: ${pageParams.get('threads')}`);
+}
+if (!Number.isSafeInteger(toolTimeoutMs) || toolTimeoutMs < 1000 || toolTimeoutMs > 600000) {
+  throw new Error(`Invalid tool timeout: ${pageParams.get('tool-timeout-ms')}`);
+}
 
 function show(status, value) {
   document.body.dataset.status = status;
@@ -69,7 +80,7 @@ async function runNcbiTool(tool, args, inputNames, outputPrefixes, requiredFiles
     args,
     inputNames,
     outputNames: outputPrefixes
-  });
+  }, toolTimeoutMs);
   if (response.status !== 0) {
     throw new Error(`${tool} exited with status ${response.status}\n${response.output?.join('\n') || ''}`);
   }
@@ -97,12 +108,6 @@ async function prepare() {
   }
   await writeBytes(runDirectory, 'query.fasta', queryBytes);
 
-  const prepared = await runWorker('/tools/stage3/harness/py-worker.js', {
-    outputDirectory: runDirectory
-  });
-  if (prepared.status !== 'complete') {
-    throw new Error(prepared.error || 'OGRDB reference preparation failed');
-  }
   referenceFiles = [
     'Homo_sapiens_IGH_VDJ_V.fasta',
     'Homo_sapiens_IGH_VDJ_D.fasta',
@@ -110,6 +115,24 @@ async function prepare() {
     'Homo_sapiens_IGH_VDJ.ndm',
     'Homo_sapiens_IGH_VDJ.aux'
   ];
+  if (referenceDirectory) {
+    const source = new URL(referenceDirectory, location.origin);
+    if (source.origin !== location.origin || !source.pathname.startsWith('/tools/stage6/results/')) {
+      throw new Error('Reference artifacts must be served from the local Stage 6 results directory');
+    }
+    for (const name of referenceFiles) {
+      const response = await fetch(`${source.pathname.replace(/\/$/, '')}/${name}`);
+      if (!response.ok) throw new Error(`Reference artifact ${name}: HTTP ${response.status}`);
+      await writeBytes(runDirectory, name, new Uint8Array(await response.arrayBuffer()));
+    }
+  } else {
+    const prepared = await runWorker('/tools/stage3/harness/py-worker.js', {
+      outputDirectory: runDirectory
+    });
+    if (prepared.status !== 'complete') {
+      throw new Error(prepared.error || 'OGRDB reference preparation failed');
+    }
+  }
   for (const [segment, reference] of [
     ['V', referenceFiles[0]],
     ['D', referenceFiles[1]],
@@ -138,7 +161,9 @@ async function prepare() {
     referenceFiles,
     databaseFiles,
     userAgent: navigator.userAgent,
-    threads: 1
+    configuredThreads,
+    hardwareConcurrency: navigator.hardwareConcurrency,
+    referenceSource: referenceDirectory || 'Pyodide OGRDB preparation'
   });
 }
 
@@ -156,7 +181,7 @@ window.__stage6RunIgblastOnce = async () => {
     '-domain_system', 'imgt',
     '-ig_seqtype', 'Ig',
     '-outfmt', '19',
-    '-num_threads', '1',
+    '-num_threads', String(configuredThreads),
     '-out', 'airr.tsv'
   ];
   const started = performance.now();
@@ -182,7 +207,8 @@ window.__stage6RunIgblastOnce = async () => {
     outputColumns: columns.length,
     outputSha256: [...new Uint8Array(hash)]
       .map(value => value.toString(16).padStart(2, '0')).join(''),
-    workerOutput: response.output || []
+    workerOutput: response.output || [],
+    threadDiagnostics: response.threadDiagnostics || null
   };
 };
 

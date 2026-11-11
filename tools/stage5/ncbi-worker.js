@@ -1,4 +1,7 @@
 const tool = new URL(self.location.href).searchParams.get('tool');
+let pthreadWorkersCreated = 0;
+const pthreadWorkersAssigned = new Set();
+let workerInstrumentationError = null;
 
 if (!['makeblastdb', 'igblastn'].includes(tool)) {
   throw new Error('Unsupported NCBI tool');
@@ -7,6 +10,26 @@ if (!['makeblastdb', 'igblastn'].includes(tool)) {
 if (self.name === 'em-pthread') {
   importScripts(`/bin/${tool}.js`);
 } else {
+  try {
+    const NativeWorker = self.Worker;
+    self.Worker = new Proxy(NativeWorker, {
+      construct(target, argumentsList, newTarget) {
+        const worker = Reflect.construct(target, argumentsList, newTarget);
+        pthreadWorkersCreated += 1;
+        const postMessage = worker.postMessage.bind(worker);
+        worker.postMessage = (message, ...options) => {
+          if (message && typeof message === 'object' &&
+              'start_routine' in message && 'pthread_ptr' in message) {
+            pthreadWorkersAssigned.add(worker);
+          }
+          return postMessage(message, ...options);
+        };
+        return worker;
+      }
+    });
+  } catch (error) {
+    workerInstrumentationError = `${error.name || 'Error'}: ${error.message || error}`;
+  }
   importScripts('/tools/stage5/opfs-memfs-bridge.js');
 
   self.onmessage = async ({ data }) => {
@@ -56,7 +79,15 @@ if (self.name === 'em-pthread') {
             self.postMessage({
               status: EXITSTATUS,
               output,
-              files
+              files,
+              threadDiagnostics: {
+                nestedWorkersCreated: pthreadWorkersCreated,
+                nestedWorkersAssigned: pthreadWorkersAssigned.size,
+                workerInstrumentationError,
+                wasmMemoryBytes: typeof wasmMemory === 'undefined'
+                  ? null
+                  : wasmMemory.buffer.byteLength
+              }
             });
           })().catch(error => {
             failed = true;

@@ -115,11 +115,12 @@ offline/deterministic option, not a CORS workaround.
 - The built NCBI artifacts are not checked into the repository. Missing
   artifacts, failed reference retrieval, missing files, nonzero tool status,
   empty output and worker errors are surfaced in the run log.
-- Large-file memory use, quota exhaustion, responsive interaction during
-  real NCBI workloads, and browser/native parity in this app are Stage 6
-  verification work. The workflow currently buffers each required input file
-  in JavaScript before writing it to a module's MEMFS; the small-fixture run
-  does not establish that this approach is suitable for large references.
+- Stage 6 measured 50 MiB OPFS/MEMFS copy paths and tested parity,
+  responsiveness, and selected failure paths. These do not establish memory
+  requirements for large-reference annotation or behavior under real quota
+  exhaustion. The workflow buffers each required input file in JavaScript
+  before writing it to a module's MEMFS; the small-fixture run does not
+  establish that this approach is suitable for arbitrary large references.
 - This stage does not add a service worker, installation manifest, result
   visualization, arbitrary germline-set selection, SRA support or AIRR TSV
   schema validation.
