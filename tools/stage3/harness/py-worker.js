@@ -1,4 +1,4 @@
-self.onmessage = async () => {
+self.onmessage = async ({ data = {} }) => {
   const log = [];
   try {
     importScripts('/tools/stage3/node_modules/pyodide/pyodide.js');
@@ -123,7 +123,37 @@ json.dumps({
     "artifacts": artifacts,
 })
 `);
-    self.postMessage({ status: 'complete', result: JSON.parse(output), log });
+    const result = JSON.parse(output);
+    if (data.outputDirectory) {
+      const preparedArtifacts = [];
+      for (const [name, encoded] of Object.entries(result.artifacts)) {
+        const binary = atob(encoded);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const file = await data.outputDirectory.getFileHandle(name, { create: true });
+        const access = await file.createSyncAccessHandle();
+        try {
+          access.truncate(0);
+          for (let offset = 0; offset < bytes.length; offset += 64 * 1024) {
+            const chunk = bytes.subarray(offset, Math.min(offset + 64 * 1024, bytes.length));
+            let written = 0;
+            while (written < chunk.length) {
+              const count = access.write(chunk.subarray(written), { at: offset + written });
+              if (count <= 0) throw new Error(`${name}: OPFS write made no progress`);
+              written += count;
+            }
+          }
+          access.flush();
+          if (access.getSize() !== bytes.length) throw new Error(`${name}: OPFS size mismatch`);
+        } finally {
+          access.close();
+        }
+        preparedArtifacts.push({ name, size: bytes.length });
+      }
+      delete result.artifacts;
+      result.preparedArtifacts = preparedArtifacts;
+    }
+    self.postMessage({ status: 'complete', result, log });
   } catch (error) {
     self.postMessage({ status: 'error', error: String(error), log });
   }

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IgBLAST browser proof of concept</title>
+  <style>
+    :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
+    body { max-width: 58rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { line-height: 1.2; }
+    fieldset { margin: 1.25rem 0; padding: 1rem; border: 1px solid #8888; border-radius: .5rem; }
+    label { display: block; margin: .5rem 0; font-weight: 600; }
+    input, select, textarea, button { font: inherit; }
+    input[type=file], select, textarea { box-sizing: border-box; width: 100%; }
+    textarea { min-height: 10rem; padding: .6rem; font-family: ui-monospace, monospace; }
+    .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0; }
+    button { padding: .45rem .8rem; }
+    #status { font-weight: 700; }
+    #log { min-height: 8rem; max-height: 22rem; overflow: auto; padding: .8rem;
+      border: 1px solid #8888; border-radius: .35rem; white-space: pre-wrap; }
+    .notice { padding: .75rem; background: #8882; border-radius: .35rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>IgBLAST browser proof of concept</h1>
+    <p class="notice">Analysis runs in browser workers. Input, reference, database, and result files are staged in this origin's private storage. The AIRR TSV is downloaded only when you choose Download.</p>
+
+    <fieldset>
+      <legend>Query FASTA</legend>
+      <label for="query-file">Choose a FASTA file</label>
+      <input id="query-file" type="file" accept=".fa,.fasta,.fna,text/plain">
+      <label for="query-text">Or paste FASTA text</label>
+      <textarea id="query-text" spellcheck="false" placeholder=">sequence_id&#10;ACGT..."></textarea>
+    </fieldset>
+
+    <fieldset>
+      <legend>References</legend>
+      <label for="reference-source">OGRDB reference source</label>
+      <select id="reference-source">
+        <option value="fixture" selected>Bundled deterministic fixture (local development)</option>
+        <option value="live">Live OGRDB (app must be same-origin with OGRDB)</option>
+      </select>
+      <p>Local development uses the captured Homo sapiens IGH_VDJ API fixture. Live mode uses relative same-origin OGRDB API paths and is available only when this app is integrated at the OGRDB origin.</p>
+    </fieldset>
+
+    <div class="actions">
+      <button id="run" type="button">Run IgBLAST</button>
+      <button id="cancel" type="button" disabled>Cancel</button>
+      <button id="download" type="button" disabled>Download AIRR TSV</button>
+      <button id="clear" type="button" disabled>Clear temporary files</button>
+    </div>
+    <p id="status" role="status" aria-live="polite">Starting…</p>
+    <pre id="log" aria-label="Run log"></pre>
+  </main>
+  <script src="/tools/stage5/app.js" defer></script>
+</body>
+</html>
