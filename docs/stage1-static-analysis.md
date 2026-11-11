@@ -2,7 +2,7 @@
 
 ## Review outcome
 
-**Review outcome: go for the bounded standalone feasibility build.** The most important discoveries are that the current `igblastn` executable unconditionally starts a worker and a formatter thread even with one search worker, and that its build explicitly requires VDB/SRA support even for a FASTA-only use case. The toolkit also declares LMDB and SQLite as build requirements for `seqdb`; selecting database version 4 is not by itself a way to remove those requirements. The user authorized Stage 2 with FASTA-only scope and explicitly excluded porting VDB; SRA access is not required.
+**Review outcome: go for the bounded standalone feasibility build.** The most important discoveries are that the current `igblastn` executable unconditionally starts a worker and a formatter thread even with one search worker, and that its build explicitly requires VDB/SRA support even for a FASTA-only use case. The toolkit also declares LMDB and SQLite as build requirements for `seqdb`; selecting database version 4 is not by itself a way to remove those requirements. The user authorized Stage 2 with FASTA-only scope and explicitly excluded porting VDB; SRA access is not required. The later implementation findings and final feasibility outcome are summarized in [Stage 7](stage7-final-report.md).
 
 The user must decide whether to proceed to Stage 2. No compilation, execution or source modifications were performed as part of this review.
 
@@ -66,4 +66,4 @@ Emscripten's [pthreads documentation](https://emscripten.org/docs/porting/pthrea
 5. In a minimal standalone browser harness, run v4 `makeblastdb` on all three references and explicitly transfer output files to the IgBLAST module. Run real `igblastn` with custom data and AIRR format 19. Compare row counts, query IDs and representative annotations against native; capture missing-file and malformed-input failures.
 6. Preserve patches, build flags, commands, exact dependency licenses, logs and failures; stop at the second review gate. A failed build, workaround requiring a major rewrite, partial success or Node-only/native-only result is not browser feasibility.
 
-**Stage 1 decision:** the user authorized proceeding to Stage 2 as a FASTA-only standalone build; SRA and VDB porting are out of scope. The static evidence did not promise a clean port or acceptable large-file performance. Source patches were to be justified by Stage 2 build and runtime evidence.
+**Stage 1 decision:** the user authorized proceeding to Stage 2 as a FASTA-only standalone build; SRA and VDB porting are out of scope. The static evidence did not promise a clean port or acceptable large-file performance. The Stage 2 build and runtime evidence is documented separately.

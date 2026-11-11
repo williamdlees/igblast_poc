@@ -1,12 +1,11 @@
 # Stage 2: FASTA-only build investigation
 
-**Status: Stage 2 review required.** A clean native and WebAssembly build of
-the pinned, patched source completed, and the browser-worker fixture output
-matched the native result. The fixture owner has confirmed authorization to
-use and redistribute the receptor_utils fixtures. The user accepts current
-published IgBLAST AIRR-C compliance for this stage; checking for output
-departures is deferred to a later stage. The Stage 2 go/no-go decision is
-required before subsequent PoC work.
+**Status: complete.** A clean native and WebAssembly build of the pinned,
+patched source completed, and the browser-worker fixture output matched the
+native result. The user authorized continuing to subsequent stages. The
+fixture owner confirmed authorization to use and redistribute the
+receptor_utils fixtures. Independent AIRR-schema validation remains deferred
+at the user's direction. The final feasibility summary is in [Stage 7](stage7-final-report.md).
 
 ## Location and toolchain
 
@@ -150,6 +149,12 @@ the WebAssembly configuration.
 
 Set `STAGE2_JOBS` to control parallel compilation; the scripts default to 4.
 The clean verification used 8 jobs on the 32-core host.
+`build-wasm.cmd` also accepts `STAGE2_BUILD_DIR` (default
+`%STAGE2_REPO%\build-wasm-pthreads`), `STAGE2_WASM_TARGETS` (default
+`makeblastdb igblastn`) and `STAGE2_WASM_LINK_FLAGS` (default
+`-pthread -fexceptions -sPTHREAD_POOL_SIZE=4 -Wl,--error-limit=0`) for
+target-specific experiments. These overrides leave the default Stage 2
+configuration unchanged.
 
 `run-browser.cmd` starts local HTTP serving with COOP/COEP headers, runs the
 test in headless Edge using a dedicated profile, writes `browser-airr.tsv`,
@@ -201,15 +206,9 @@ and redistribution of these fixtures. No fixture-rights blocker remains.
 
 ## Review
 
-The central technical feasibility check succeeded on this small fixture:
-the reproducibly built NCBI programs ran in browser workers and matched the
-native result.
-The user accepts current published IgBLAST AIRR-C compliance for this stage;
-checking for output departures is deferred to a later stage. This supports a
-**conditional go for further investigation**. The clean source/build
-reproduction is complete, but does not demonstrate production readiness.
-Fixture usage and redistribution have been authorized by the user. Further
-work must address the 16 MiB fixed-memory limit, warning-only invalid input,
-and disabled remote service mappers. The browser harness uses in-memory files
-and is not a storage-throughput test. No Python, persistent storage
-integration, or app implementation has been started.
+The central Stage 2 feasibility check succeeded on the small fixture: the
+reproducibly built NCBI programs ran in browser workers and matched native
+output. Later stages added Python reference preparation, persistent storage,
+the local app workflow, failure checks, and I/O/memory measurements. The
+clean source/build reproduction and these later results do not demonstrate
+production readiness; remaining limits are summarized in [Stage 7](stage7-final-report.md).

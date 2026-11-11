@@ -1,14 +1,13 @@
 # Stage 6: correctness and I/O verification
 
-**Status: Stage 6 is complete with a documented limitation, at the user's
-direction.** The actual Stage 5 workflow matches a native run generated from
-the same OGRDB-prepared references on the 10-query fixture. The 10,000-sequence
-browser run aborts with `NCBI tool abort: OOM`;
-the copied WebAssembly module has a fixed 16 MiB memory limit. Five native
-10,000-sequence runs completed, but no paired speed result can be reported
-because the browser could not process the same input. The separate Stage 2
-browser comparison remains only a distinct prior-baseline check; its TSV is
-not a Stage 5 native substitute.
+**Status: complete with a documented limitation, at the user's direction.**
+The Stage 5 workflow matches native output on the 10-query fixture. In the
+original Stage 6 test, the 10,000-sequence browser run aborted with
+`NCBI tool abort: OOM` under the copied module's fixed 16 MiB memory limit,
+so no paired speed result was available then. The later user-requested
+250/500 MiB, eight-thread comparison is reported separately in [Stage
+6a](stage6a-native-memory.md); it does not meet the original one-thread
+comparison conditions.
 
 No NCBI source or toolchain was downloaded, cloned, or rebuilt. The existing
 browser assets were reverified before testing:
@@ -281,7 +280,7 @@ run built fresh V/D/J nucleotide BLAST v4 databases with
 for this comparison.
 
 No NCBI source or toolchain was downloaded, cloned, rebuilt, or accessed
-through the previously denied external build path. Stage 7 has not started.
-Independent AIRR-schema validation remains deferred as directed; 50 MiB
-annotation, peak memory, real storage-quota exhaustion, and cold-cache
-behavior were not measured.
+through the previously denied external build path for the original Stage 6
+run. Independent AIRR-schema validation remains deferred as directed; 50 MiB
+annotation, real storage-quota exhaustion, and cold-cache behavior were not
+measured. The Stage 7 consolidation is in [the final report](stage7-final-report.md).

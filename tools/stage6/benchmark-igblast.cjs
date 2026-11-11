@@ -12,6 +12,14 @@ const browser = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.e
 const nativeOnlyIndex = process.argv.indexOf('--native-only');
 const nativeOnlyArtifacts = nativeOnlyIndex >= 0 ? process.argv[nativeOnlyIndex + 1] : null;
 const smallParityRun = process.argv.includes('--small-parity');
+const threadsIndex = process.argv.indexOf('--threads');
+const threads = threadsIndex < 0 ? 1 : Number(process.argv[threadsIndex + 1]);
+const timeoutIndex = process.argv.indexOf('--tool-timeout-ms');
+const toolTimeoutMs = timeoutIndex < 0 ? 600000 : Number(process.argv[timeoutIndex + 1]);
+const referenceArtifactsIndex = process.argv.indexOf('--reference-artifacts');
+const referenceArtifacts = referenceArtifactsIndex < 0
+  ? null
+  : path.resolve(root, process.argv[referenceArtifactsIndex + 1] || '');
 const repeats = smallParityRun ? 1 : 5;
 const expectedQueryRecords = smallParityRun ? 10 : 10000;
 const requiredInputs = [
@@ -22,6 +30,17 @@ const requiredInputs = [
   'Homo_sapiens_IGH_VDJ.ndm',
   'Homo_sapiens_IGH_VDJ.aux'
 ];
+
+if (!Number.isSafeInteger(threads) || threads < 1 || threads > 64) {
+  throw new Error(`Invalid --threads value: ${threadsIndex < 0 ? '' : process.argv[threadsIndex + 1]}`);
+}
+if (!Number.isSafeInteger(toolTimeoutMs) || toolTimeoutMs < 1000 || toolTimeoutMs > 600000) {
+  throw new Error(`Invalid --tool-timeout-ms value: ${timeoutIndex < 0 ? '' : process.argv[timeoutIndex + 1]}`);
+}
+if (referenceArtifacts && (!fs.existsSync(referenceArtifacts) ||
+    !fs.statSync(referenceArtifacts).isDirectory())) {
+  throw new Error(`Reference artifact directory does not exist: ${referenceArtifacts}`);
+}
 
 function assertCommand(result, label) {
   if (result.error) throw new Error(`${label}: ${result.error.message}`);
@@ -107,6 +126,26 @@ async function evaluate(devtools, expression) {
   return response.result?.value;
 }
 
+async function getBrowserProcessCpu(devtools) {
+  const result = await devtools.send('SystemInfo.getProcessInfo');
+  return new Map((result.processInfo || []).map(process => [
+    process.id,
+    { type: process.type, cpuTime: process.cpuTime }
+  ]));
+}
+
+function browserCpuDelta(before, after) {
+  let cpuTimeSeconds = 0;
+  for (const [id, process] of after) {
+    cpuTimeSeconds += process.cpuTime - (before.get(id)?.cpuTime || 0);
+  }
+  return {
+    cpuTimeSeconds: Math.round(cpuTimeSeconds * 1000) / 1000,
+    processCount: after.size,
+    processTypes: [...new Set([...after.values()].map(process => process.type))].sort()
+  };
+}
+
 async function waitForBrowserPreparation(devtools) {
   const deadline = Date.now() + 600000;
   while (Date.now() < deadline) {
@@ -184,6 +223,17 @@ function summarizeFasta(file) {
   };
 }
 
+function summarizeFiles(directory, names) {
+  return Object.fromEntries(names.map(name => {
+    const file = path.join(directory, name);
+    const content = fs.readFileSync(file);
+    return [name, {
+      sizeBytes: content.length,
+      sha256: crypto.createHash('sha256').update(content).digest('hex')
+    }];
+  }));
+}
+
 function runNativeIgblast(executable, artifactDirectory, databaseDirectory, outputPath, env) {
   const args = [
     '-query', path.join(artifactDirectory, 'query.fasta'),
@@ -196,7 +246,7 @@ function runNativeIgblast(executable, artifactDirectory, databaseDirectory, outp
     '-domain_system', 'imgt',
     '-ig_seqtype', 'Ig',
     '-outfmt', '19',
-    '-num_threads', '1',
+    '-num_threads', String(threads),
     '-out', outputPath
   ];
   const result = runNative(executable, args, databaseDirectory, env, 'native igblastn');
@@ -248,7 +298,7 @@ async function main() {
       query: queryManifest,
       repeats: measurements.length,
       igblastArguments: [
-        '-organism human', '-domain_system imgt', '-ig_seqtype Ig', '-outfmt 19', '-num_threads 1'
+        '-organism human', '-domain_system imgt', '-ig_seqtype Ig', '-outfmt 19', `-num_threads ${threads}`
       ],
       timerBoundary: 'Fresh native igblastn process launch through completed AIRR output; excludes reference preparation, makeblastdb, and query generation.',
       measurements,
@@ -275,6 +325,12 @@ async function main() {
       sizeBytes: content.length,
       sha256: crypto.createHash('sha256').update(content).digest('hex')
     };
+  } else if (referenceArtifacts) {
+    const queryPath = path.join(resultsRoot, 'query-10000.fasta');
+    if (!fs.existsSync(queryPath)) {
+      throw new Error(`Generated 10,000-record query is missing: ${queryPath}`);
+    }
+    queryManifest = summarizeFasta(queryPath);
   } else {
     const generated = spawnSync(process.execPath, [
       path.join(__dirname, 'generate-10k-fasta.cjs')
@@ -286,6 +342,20 @@ async function main() {
       queryManifest.uniqueIdentifierCount !== expectedQueryRecords) {
     throw new Error(`Query manifest does not describe ${expectedQueryRecords} unique records`);
   }
+  if (referenceArtifacts) {
+    const referenceQuery = summarizeFasta(path.join(referenceArtifacts, 'query.fasta'));
+    if (referenceQuery.sha256 !== queryManifest.sha256) {
+      throw new Error('Reference artifact query does not match the generated benchmark query');
+    }
+    for (const name of requiredInputs.slice(1)) {
+      if (!fs.existsSync(path.join(referenceArtifacts, name))) {
+        throw new Error(`Required reference artifact is missing: ${path.join(referenceArtifacts, name)}`);
+      }
+    }
+  }
+  const referenceManifest = referenceArtifacts
+    ? summarizeFiles(referenceArtifacts, requiredInputs.slice(1))
+    : null;
 
   const makeblastdb = path.join(root, 'bin', 'makeblastdb.exe');
   const igblastn = path.join(root, 'bin', 'igblastn.exe');
@@ -322,6 +392,7 @@ async function main() {
   serverProcess.stderr.on('data', chunk => { serverError += chunk; });
   let edgeProcess;
   let devtools;
+  let browserControl;
 
   try {
     const serverDeadline = Date.now() + 30000;
@@ -337,7 +408,17 @@ async function main() {
       }
       await new Promise(resolve => setTimeout(resolve, 200));
     }
-    const pageUrl = `${baseUrl}/tools/stage6/igblast-speed.html${smallParityRun ? '?fixture=small' : ''}`;
+    const pageParams = new URLSearchParams();
+    if (smallParityRun) pageParams.set('fixture', 'small');
+    pageParams.set('threads', String(threads));
+    pageParams.set('tool-timeout-ms', String(toolTimeoutMs));
+    if (referenceArtifacts) {
+      pageParams.set(
+        'reference-artifacts',
+        `/${path.relative(root, referenceArtifacts).split(path.sep).join('/')}`
+      );
+    }
+    const pageUrl = `${baseUrl}/tools/stage6/igblast-speed.html?${pageParams}`;
     edgeProcess = spawn(browser, [
       '--headless=new',
       '--disable-gpu',
@@ -362,6 +443,7 @@ async function main() {
       edgeProcess.once('exit', code => reject(new Error(`Edge exited with ${code}\n${edgeError}`)));
     });
     const devtoolsPort = new URL(endpoint).port;
+    browserControl = await connectDevTools(endpoint);
     const target = await waitForPage(devtoolsPort, pageUrl, edgeProcess);
     devtools = await connectDevTools(target.webSocketDebuggerUrl);
     await devtools.send('Runtime.enable');
@@ -388,9 +470,37 @@ async function main() {
       for (const mode of browserFirst ? ['browser', 'native'] : ['native', 'browser']) {
         runOrder.push(mode);
         if (mode === 'browser') {
+          let cpuBefore;
+          let cpuSamplingNote = null;
+          try {
+            cpuBefore = await getBrowserProcessCpu(browserControl);
+          } catch (error) {
+            cpuSamplingNote = error.message;
+          }
+          const wallStarted = performance.now();
           const encoded = await evaluate(devtools,
             'window.__stage6RunIgblastOnce().then(JSON.stringify)');
           const measurement = JSON.parse(encoded);
+          const wallElapsedMs = performance.now() - wallStarted;
+          let cpuAfter;
+          try {
+            cpuAfter = await getBrowserProcessCpu(browserControl);
+          } catch (error) {
+            cpuSamplingNote = cpuSamplingNote || error.message;
+          }
+          if (cpuBefore && cpuAfter) {
+            const cpu = browserCpuDelta(cpuBefore, cpuAfter);
+            measurement.browserCpu = {
+              ...cpu,
+              measuredWallMs: Math.round(wallElapsedMs * 100) / 100,
+              averageCoresUsed: Math.round(cpu.cpuTimeSeconds / (wallElapsedMs / 1000) * 1000) / 1000
+            };
+          } else {
+            measurement.browserCpu = {
+              status: 'unavailable',
+              note: cpuSamplingNote || 'Edge process CPU time was unavailable'
+            };
+          }
           if (measurement.outputRows !== expectedQueryRecords) {
             throw new Error(`Browser run returned ${measurement.outputRows} rows, expected ${expectedQueryRecords}`);
           }
@@ -438,15 +548,19 @@ async function main() {
       queryRecordCount: expectedQueryRecords,
       nativeVersions,
       browser: browserPreparation.userAgent,
+      browserHardwareConcurrency: browserPreparation.hardwareConcurrency,
       platform: `${os.type()} ${os.release()} ${os.arch()}`,
       cpu: os.cpus()[0]?.model || 'unknown',
       logicalCpus: os.cpus().length,
-      timerBoundary: 'Fresh igblastn process/worker launch through completed AIRR output; excludes Edge process startup, reference preparation, makeblastdb, and query generation.',
+      timerBoundary: 'Native: fresh process launch through output completion and row-count check. Browser: fresh tool worker through OPFS-to-MEMFS input transfer, annotation, output persistence, OPFS readback, row/ID validation, and SHA-256; excludes Edge startup, reference preparation, makeblastdb, and query generation.',
       repeats,
       runOrder,
       igblastArguments: [
-        '-organism human', '-domain_system imgt', '-ig_seqtype Ig', '-outfmt 19', '-num_threads 1'
+        '-organism human', '-domain_system imgt', '-ig_seqtype Ig', '-outfmt 19', `-num_threads ${threads}`
       ],
+      configuredThreads: threads,
+      referenceArtifacts: referenceArtifacts ? path.relative(root, referenceArtifacts) : 'Pyodide OGRDB preparation',
+      referenceManifest,
       database: 'Separate native and browser BLAST v4 databases generated from the exact same Stage 5 OGRDB V/D/J FASTAs with -dbtype nucl -parse_seqids.',
       browserMeasurements,
       nativeMeasurements,
@@ -479,6 +593,7 @@ async function main() {
       }
     }
     if (devtools?.socket.readyState === WebSocket.OPEN) devtools.socket.close();
+    if (browserControl?.socket.readyState === WebSocket.OPEN) browserControl.socket.close();
     if (edgeProcess && edgeProcess.exitCode === null) edgeProcess.kill();
     if (serverProcess.exitCode === null) serverProcess.kill();
   }

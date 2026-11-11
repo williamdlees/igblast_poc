@@ -1,8 +1,8 @@
 # Stage 3: Pyodide reference-preparation proof
 
-**Status: implementation step complete; user review required before the next
-step.** This is a bounded proof of browser Python/reference preparation, not
-the storage bridge or the application workflow.
+**Status: complete.** This is a bounded proof of browser
+Python/reference-preparation behavior; the storage bridge and app workflow
+are documented in later stages.
 
 ## Result
 
@@ -121,5 +121,5 @@ current OGRDB page headers/resources; it does not prove that the deployed
 application will receive the COOP/COEP headers it needs. Newline normalization
 is used only for comparing native and browser-generated reference text.
 
-**Review checkpoint:** confirm this reference-preparation and same-origin
-network proof before starting the next planned step, the storage bridge.
+The user proceeded to the storage-bridge stage after this review checkpoint.
+The consolidated feasibility conclusion is in [Stage 7](stage7-final-report.md).

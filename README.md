@@ -1,4 +1,21 @@
-## Proof of concept for IgBLAST PWA App
+# IgBLAST browser proof of concept
+
+## Current status
+
+Stages 1–7 document a bounded feasibility proof for running the real NCBI
+`makeblastdb` and `igblastn` programs, Pyodide reference preparation, and an
+OPFS-backed workflow in desktop Chromium on Windows. The local fixture
+workflow completes and produces AIRR TSV output. See the [Stage 7 final
+report](docs/stage7-final-report.md) and its linked stage reports for
+reproducible commands, versions, measurements, and limitations.
+
+This repository is **not a production-ready, installable or offline PWA**.
+The tested 10,000-sequence browser run used repeated copies of a 10-sequence
+fixture and was about four times slower than a matching native run. Live
+OGRDB API access was tested separately; the end-to-end app uses a local
+fixture. A deployed pthread build also requires COOP/COEP headers and
+validation of third-party resources. Browser memory availability and a
+general large-input limit have not been established.
 
 ## Rationale
 
@@ -6,11 +23,13 @@ The purpose of this project is to create a proof of concept for a Progressive We
 
 ## Envisaged features in the final app
 
+These are product goals, not all implemented features of this PoC.
+
 - Input immunoglobulin sequences through a web interface: either pasting into a text box or uploading a FASTA file.
 - Select a reference database for the IgBLAST analysis or provide their own reference sequences
 - Perform IgBLAST analysis on the submitted sequences.
 - Visualize the analysis results in an intuitive and interactive manner.
-- Download the analysis results in AIRR-C csv format
+- Download analysis results as AIRR TSV in the PoC; the original CSV goal is not implemented.
 - Support for offline usage as a PWA.
 - Responsive design for use on various devices, including desktops, tablets, and smartphones.
 - The app should be capable of handling large files (e.g. several 10s of MBs) and i/o should have comparable throughput to that of a desktop app
