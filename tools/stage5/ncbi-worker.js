@@ -1,4 +1,3 @@
-const CHUNK_SIZE = 64 * 1024;
 const tool = new URL(self.location.href).searchParams.get('tool');
 
 if (!['makeblastdb', 'igblastn'].includes(tool)) {
@@ -8,58 +7,7 @@ if (!['makeblastdb', 'igblastn'].includes(tool)) {
 if (self.name === 'em-pthread') {
   importScripts(`/bin/${tool}.js`);
 } else {
-  async function readOpfsFile(directory, name) {
-    const handle = await directory.getFileHandle(name);
-    const size = (await handle.getFile()).size;
-    const bytes = new Uint8Array(size);
-    const access = await handle.createSyncAccessHandle();
-    try {
-      for (let offset = 0; offset < size; offset += CHUNK_SIZE) {
-        const view = bytes.subarray(offset, Math.min(offset + CHUNK_SIZE, size));
-        let read = 0;
-        while (read < view.length) {
-          const count = access.read(view.subarray(read), { at: offset + read });
-          if (count <= 0) throw new Error(`${name}: unexpected EOF at ${offset + read}`);
-          read += count;
-        }
-      }
-    } finally {
-      access.close();
-    }
-    return bytes;
-  }
-
-  async function persistOutput(directory, name) {
-    const sourcePath = `/work/${name}`;
-    const size = FS.stat(sourcePath).size;
-    if (size === 0) throw new Error(`${name}: output file is empty`);
-    const source = FS.open(sourcePath, 'r');
-    const handle = await directory.getFileHandle(name, { create: true });
-    const access = await handle.createSyncAccessHandle();
-    const chunk = new Uint8Array(CHUNK_SIZE);
-    try {
-      access.truncate(0);
-      for (let offset = 0; offset < size; offset += CHUNK_SIZE) {
-        const length = Math.min(CHUNK_SIZE, size - offset);
-        const read = source.stream_ops.read(source, chunk, 0, length, offset);
-        if (read !== length) throw new Error(`${name}: short MEMFS read`);
-        let written = 0;
-        while (written < read) {
-          const count = access.write(chunk.subarray(written, read), {
-            at: offset + written
-          });
-          if (count <= 0) throw new Error(`${name}: OPFS write made no progress`);
-          written += count;
-        }
-      }
-      access.flush();
-      if (access.getSize() !== size) throw new Error(`${name}: OPFS size mismatch`);
-      return { name, size };
-    } finally {
-      FS.close(source);
-      access.close();
-    }
-  }
+  importScripts('/tools/stage5/opfs-memfs-bridge.js');
 
   self.onmessage = async ({ data }) => {
     const output = [];
@@ -67,7 +15,7 @@ if (self.name === 'em-pthread') {
     try {
       const inputs = {};
       for (const name of data.inputNames) {
-        inputs[name] = await readOpfsFile(data.directory, name);
+        inputs[name] = await OpfsMemfsBridge.readOpfsFile(data.directory, name);
       }
       self.Module = {
         arguments: data.args,
@@ -103,7 +51,7 @@ if (self.name === 'em-pthread') {
             if (!names.length) throw new Error('The NCBI tool produced no expected output files');
             const files = [];
             for (const name of names) {
-              files.push(await persistOutput(data.directory, name));
+              files.push(await OpfsMemfsBridge.persistOutput(FS, data.directory, name));
             }
             self.postMessage({
               status: EXITSTATUS,
