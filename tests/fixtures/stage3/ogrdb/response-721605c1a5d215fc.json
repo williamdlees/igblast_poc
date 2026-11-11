@@ -1,0 +1,24 @@
+{
+  "species": [
+    {
+      "id": "10090",
+      "label": "Mus musculus"
+    },
+    {
+      "id": "9606",
+      "label": "Homo sapiens"
+    },
+    {
+      "id": "10041",
+      "label": "Peromyscus leucopus"
+    },
+    {
+      "id": "8022",
+      "label": "Oncorhynchus mykiss"
+    },
+    {
+      "id": "9544",
+      "label": "Macaca mulatta"
+    }
+  ]
+}

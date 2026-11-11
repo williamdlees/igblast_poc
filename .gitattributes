@@ -1,0 +1,2 @@
+/tests/fixtures/stage3/ogrdb/response-*.fasta -text
+/tests/fixtures/stage3/ogrdb/response-*.json -text
