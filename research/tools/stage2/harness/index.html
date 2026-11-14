@@ -1,0 +1,78 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>NCBI Stage 2 browser check</title>
+<pre id="result">Starting</pre>
+<script>
+(async () => {
+  const result = document.getElementById('result');
+  const log = [];
+  const fail = message => { throw new Error(message); };
+  const load = async name => {
+    const response = await fetch(`/research/tests/fixtures/stage2/${name}`);
+    if (!response.ok) fail(`Fixture ${name}: HTTP ${response.status}`);
+    return new Uint8Array(await response.arrayBuffer());
+  };
+  const run = (tool, args, files) => new Promise((resolve, reject) => {
+    const worker = new Worker(`/research/tools/stage2/harness/worker.js?tool=${tool}`);
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      reject(new Error(`${tool} timed out`));
+    }, 180000);
+    worker.onerror = event => {
+      clearTimeout(timeout);
+      worker.terminate();
+      reject(new Error(`${tool} worker: ${event.message}`));
+    };
+    worker.onmessage = ({ data }) => {
+      clearTimeout(timeout);
+      worker.terminate();
+      if (data.error) reject(new Error(`${tool} ${data.error}\n${data.output.join('\n')}`));
+      else resolve(data);
+    };
+    worker.postMessage({ args, files });
+  });
+  try {
+    if (!crossOriginIsolated) fail('Cross-origin isolation is unavailable');
+    let files = {};
+    for (const name of ['V-matched.fasta', 'D.fasta', 'J.fasta', 'query.fasta',
+                        'Homo_sapiens_IGH.aux', 'Homo_sapiens_IGH.ndm']) {
+      files[name] = await load(name);
+    }
+    for (const [segment, input] of [['V', 'V-matched.fasta'], ['D', 'D.fasta'], ['J', 'J.fasta']]) {
+      const r = await run('makeblastdb', ['-in', input, '-dbtype', 'nucl',
+        '-blastdb_version', '4', '-parse_seqids', '-out', segment], files);
+      log.push({ step: `makeblastdb ${segment}`, status: r.status, output: r.output });
+      if (r.status !== 0 || !r.files[`${segment}.nin`]) fail(`makeblastdb ${segment} failed`);
+      files = r.files;
+    }
+    const args = ['-query', 'query.fasta', '-germline_db_V', 'V', '-germline_db_D', 'D',
+      '-germline_db_J', 'J', '-custom_internal_data', 'Homo_sapiens_IGH.ndm',
+      '-auxiliary_data', 'Homo_sapiens_IGH.aux', '-organism', 'human', '-domain_system', 'imgt',
+      '-ig_seqtype', 'Ig', '-outfmt', '19', '-num_threads', '1', '-out', 'airr.tsv'];
+    const annotation = await run('igblastn', args, files);
+    log.push({ step: 'igblastn', status: annotation.status, output: annotation.output });
+    if (annotation.status !== 0 || !annotation.files['airr.tsv']?.length) fail('igblastn failed');
+    const airr = new TextDecoder().decode(annotation.files['airr.tsv']);
+    const missingArgs = args.slice();
+    missingArgs[1] = 'missing.fasta';
+    const missing = await run('igblastn', missingArgs, files);
+    log.push({ step: 'missing query', status: missing.status, output: missing.output });
+    if (missing.status === 0 || !missing.output.join('\n').includes('missing.fasta')) {
+      fail('Missing query did not produce the expected error');
+    }
+    files['bad.fasta'] = new TextEncoder().encode('>bad\nZZZZZZZZZZ\n');
+    const invalidArgs = args.slice();
+    invalidArgs[1] = 'bad.fasta';
+    const invalid = await run('igblastn', invalidArgs, files);
+    log.push({ step: 'invalid query', status: invalid.status, output: invalid.output });
+    if (!invalid.output.join('\n').includes('Ignoring invalid residues')) {
+      fail('Invalid query did not produce the expected warning');
+    }
+    result.textContent = JSON.stringify({ log, airr }, null, 2);
+    document.body.dataset.status = 'complete';
+  } catch (error) {
+    result.textContent = JSON.stringify({ error: String(error), log }, null, 2);
+    document.body.dataset.status = 'error';
+  }
+})();
+</script>

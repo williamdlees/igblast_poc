@@ -1,0 +1,9 @@
+{
+  "name": "igblast-pwa-poc",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Browser-based IgBLAST proof of concept",
+  "scripts": {
+    "dev": "node scripts/serve.cjs"
+  }
+}

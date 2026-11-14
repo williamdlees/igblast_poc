@@ -6,20 +6,42 @@ Stages 1–7 document a bounded feasibility proof for running the real NCBI
 `makeblastdb` and `igblastn` programs, Pyodide reference preparation, and an
 OPFS-backed workflow in desktop Chromium on Windows. The local fixture
 workflow completes and produces AIRR TSV output. See the [Stage 7 final
-report](docs/stage7-final-report.md) and its linked stage reports for
+report](research/docs/stage7-final-report.md) and its linked stage reports for
 reproducible commands, versions, measurements, and limitations.
 
 This repository is **not a production-ready, installable or offline PWA**.
+The application scaffold is in `public/` and `src/`; the completed research
+archive is in `research/`. The Stage 5 workflow remains available there as
+reproducibility evidence and is not the new app implementation.
 The tested 10,000-sequence browser run used repeated copies of a 10-sequence
 fixture and was about four times slower than a matching native run. Live
 OGRDB API access was tested separately; the end-to-end app uses a local
 fixture. A deployed pthread build also requires COOP/COEP headers and
 validation of third-party resources. Browser memory availability and a
 general large-input limit have not been established.
+The fixture-backed workflow refers to the archived Stage 5 harness; the new
+app scaffold does not yet run analysis.
 
 ## Rationale
 
 The purpose of this project is to create a proof of concept for a Progressive Web App (PWA) that leverages IgBLAST for immunoglobulin sequence analysis. This app aims to provide a user-friendly interface for researchers to input sequences, perform IgBLAST analysis, and visualize the results efficiently within a web application.
+
+The app will be hosted by the OGRDB server at https://ogrdb.airr-community.org and will be accessible at https://ogrdb.airr-community.org/igblast. It will be built in this repo and the final package will be copied to the server for deployment.
+
+## Repository layout
+
+- `public/` contains the browser entry point and PWA metadata.
+- `src/` is the application source; worker, workflow, reference, storage and
+  IgBLAST modules belong in their respective subdirectories as they are
+  developed.
+- `tests/`, `scripts/` and `docs/` are reserved for app-specific tests,
+  development tooling and documentation.
+- `research/` preserves the completed investigation, fixtures, patches and
+  runnable stage harnesses. See the [final report](research/docs/stage7-final-report.md).
+
+Run the app shell locally with `npm run dev`; it serves at
+`http://127.0.0.1:8080/` by default. The end-to-end analysis workflow is not
+yet connected to this new scaffold.
 
 ## Envisaged features in the final app
 

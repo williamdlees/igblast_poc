@@ -1,0 +1,16 @@
+{
+  "name": "IgBLAST browser proof of concept",
+  "short_name": "IgBLAST PoC",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fa",
+  "theme_color": "#17324d",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
